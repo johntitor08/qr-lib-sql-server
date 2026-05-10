@@ -1,8 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // api.js — Bibliotheca API istemcisi (Firebase yok, JWT tabanlı)
+// API_BASE ve ADMIN_EMAIL index.html içinde tanımlı
 // ═══════════════════════════════════════════════════════════════
-
-const API_BASE = 'http://localhost:3000/api'; // Prod'da değiştir
 
 // ── Token yardımcısı ─────────────────────────────────────────
 function getToken() {
@@ -49,6 +48,30 @@ function normalizeHighlight(hl) {
 // ════════════════════════════════════════════════════════════════
 // AUTH
 // ════════════════════════════════════════════════════════════════
+let _authTab = 'login';
+
+function switchAuthTab(tab) {
+  _authTab = tab;
+  document.getElementById('authTabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('authTabRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('authSubmitBtn').textContent = tab === 'login' ? 'Giriş Yap' : 'Kayıt Ol';
+  document.getElementById('authError').classList.remove('show');
+  document.getElementById('authSuccess').classList.remove('show');
+  document.getElementById('authPendingMsg').style.display = 'none';
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.classList.add('show');
+  document.getElementById('authSuccess').classList.remove('show');
+}
+
+function showAuthSuccess(msg) {
+  const el = document.getElementById('authSuccess');
+  el.textContent = msg; el.classList.add('show');
+  document.getElementById('authError').classList.remove('show');
+}
+
 async function submitAuth() {
   const email    = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
