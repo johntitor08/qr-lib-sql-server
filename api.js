@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// api.js — Bibliotheca API istemcisi (Firebase yok, JWT tabanlı)
-// API_BASE ve ADMIN_EMAIL index.html içinde tanımlı
-// ═══════════════════════════════════════════════════════════════
-
-// ── api nesnesi — index.html uyumluluğu ──────────────────────────────
 const api = {
   get: (path) => apiFetch(path),
   post: (path, body) =>
@@ -38,12 +32,10 @@ async function getAuthHeader() {
   };
 }
 
-// ── Genel fetch sarmalayıcısı ─────────────────────────────────
 async function apiFetch(path, options = {}) {
   const headers = { ...(await getAuthHeader()), ...(options.headers || {}) };
   const res = await fetch(API_BASE + path, { ...options, headers });
   if (res.status === 401) {
-    // Token geçersiz/süresi dolmuş — çıkış yap
     clearToken();
     _currentUser = null;
     document.getElementById("authScreen")?.classList.remove("hidden");
@@ -56,15 +48,11 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
-// ── Alan adı normalizer ───────────────────────────────────────
 function normalizeHighlight(hl) {
   hl.bookId = hl.bookId || hl.book_id;
   return hl;
 }
 
-// ════════════════════════════════════════════════════════════════
-// AUTH
-// ════════════════════════════════════════════════════════════════
 let _authTab = "login";
 
 function switchAuthTab(tab) {
@@ -130,7 +118,6 @@ async function submitAuth() {
         body: JSON.stringify({ email, password }),
       });
       if (data.token) {
-        // Admin anında giriş yaptı
         setToken(data.token);
         _currentUser = { email };
         await onLoginSuccess();
@@ -151,14 +138,12 @@ async function submitAuth() {
 
 async function onLoginSuccess() {
   document.getElementById("authScreen").classList.add("hidden");
-  // Sidebar kullanıcı bilgisi
   const strip = document.getElementById("sidebarUserStrip");
   const avatar = document.getElementById("sidebarUserAvatar");
   const email = document.getElementById("sidebarUserEmail");
   if (strip) strip.style.display = "";
   if (avatar) avatar.textContent = (_currentUser.email || "?")[0].toUpperCase();
   if (email) email.textContent = _currentUser.email || "";
-  // Settings sayfası
   const authSec = document.getElementById("settingsAuthSection");
   const connForm = document.getElementById("settingsConnForm");
   const sAvatar = document.getElementById("settingsUserAvatar");
@@ -210,7 +195,6 @@ async function signOut() {
   setConnStatus(false, "Oturum Yok");
 }
 
-// Sayfa yüklendiğinde token varsa oturumu geri yükle
 window.addEventListener("load", async () => {
   applyTheme(currentTheme);
   const token = getToken();
@@ -220,12 +204,10 @@ window.addEventListener("load", async () => {
     return;
   }
   try {
-    // Token geçerliliğini doğrula
     const me = await apiFetch("/users/me");
     _currentUser = { email: me.email };
     await onLoginSuccess();
   } catch (e) {
-    // Token geçersiz veya backend yok
     clearToken();
     document.getElementById("authScreen")?.classList.remove("hidden");
     if (e.message.includes("fetch") || e.message.includes("network")) {
@@ -237,9 +219,6 @@ window.addEventListener("load", async () => {
   }
 });
 
-// ════════════════════════════════════════════════════════════════
-// BOOKS
-// ════════════════════════════════════════════════════════════════
 async function loadBooks(page = 1) {
   if (demoMode) {
     renderAll();
@@ -395,9 +374,6 @@ async function deleteBook(bookId) {
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// HIGHLIGHTS
-// ════════════════════════════════════════════════════════════════
 async function loadHighlights() {
   if (demoMode) return;
   try {
@@ -472,9 +448,6 @@ async function deleteHighlight(id) {
   renderHighlights();
 }
 
-// ════════════════════════════════════════════════════════════════
-// LOANS
-// ════════════════════════════════════════════════════════════════
 async function loadLoans() {
   if (demoMode) return;
   try {
@@ -582,9 +555,6 @@ async function deleteLoan(id) {
   toast("Kayıt silindi");
 }
 
-// ════════════════════════════════════════════════════════════════
-// ADMIN PANEL
-// ════════════════════════════════════════════════════════════════
 async function renderAdminPanel() {
   if (!_currentUser || _currentUser.email !== ADMIN_EMAIL) {
     showPage("dashboard");
