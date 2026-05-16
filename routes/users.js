@@ -1,7 +1,6 @@
-// routes/users.js — Kayıt / giriş / admin (Firebase yok)
-const express  = require('express');
-const bcrypt   = require('bcrypt');
-const jwt      = require('jsonwebtoken');
+const express = require('express');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { sql, getPool } = require('../db');
 const { requireAuth, requireApproved, requireAdmin } = require('../middleware/auth');
@@ -19,9 +18,6 @@ function makeToken(user) {
   );
 }
 
-// ── Açık rotalar (auth gerekmez) ────────────────────────────
-
-// POST /api/users/register — yeni kullanıcı kaydı
 router.post('/register', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'E-posta ve şifre zorunlu' });
@@ -53,7 +49,6 @@ router.post('/register', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/users/login — giriş
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'E-posta ve şifre zorunlu' });
@@ -78,10 +73,8 @@ router.post('/login', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Korumalı rotalar ────────────────────────────────────────
 router.use(requireAuth);
 
-// GET /api/users/me
 router.get('/me', async (req, res) => {
   try {
     const pool = await getPool();
@@ -93,7 +86,6 @@ router.get('/me', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Admin rotaları ──────────────────────────────────────────
 router.get('/all', requireAdmin, async (req, res) => {
   try {
     const pool = await getPool();
