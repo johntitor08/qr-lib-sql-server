@@ -1,5 +1,5 @@
-if (!window.API_BASE) {
-  throw new Error("API_BASE tanımlı değil");
+if (typeof API_BASE === "undefined" || !API_BASE) {
+  throw new Error("API_BASE tanımlı değil — index.html içindeki API_BASE sabitini ayarlayın");
 }
 
 const state = {
@@ -113,7 +113,10 @@ async function apiFetch(path, options = {}) {
     return body;
   } catch (err) {
     if (err.name === "TypeError") {
-      throw new Error("Backend bağlantısı yok veya ağ hatası");
+      // fetch() rejects with a TypeError on network failure / CORS / DNS
+      const netErr = new Error("Backend bağlantısı yok veya ağ hatası");
+      netErr.isNetworkError = true;
+      throw netErr;
     }
     throw err;
   }
@@ -231,6 +234,23 @@ async function handleAuthSubmit() {
   }
 }
 
+// Loans are fetched here (loadBooks / loadHighlights live in index.html and
+// share the same global scope). onLoginSuccess depends on this existing.
+async function loadLoans() {
+  if (demoMode || !_currentUser) return;
+  try {
+    const data = await api.get("/loans");
+    loans = (Array.isArray(data) ? data : []).map((l) => ({
+      ...l,
+      bookName: l.book_name,
+    }));
+    renderLoans();
+    updateLoansBadge();
+  } catch (e) {
+    /* ödünçler yüklenemedi, sessizce geç */
+  }
+}
+
 async function onLoginSuccess() {
   document.getElementById("authScreen").classList.add("hidden");
 
@@ -287,3 +307,46 @@ async function signOut() {
 
   forceLogout("Çıkış yapıldı");
 }
+
+// ── Startup bootstrap ─────────────────────────────────────────────────────────
+// Restore the saved theme and, if a token is present, validate it and auto
+// log the user back in. On network failure fall back to demo mode. The auth
+// screen is visible by default, so no token simply leaves it shown.
+window.addEventListener("load", async () => {
+  if (typeof applyTheme === "function") applyTheme(currentTheme);
+
+  const token = tokenStore.get();
+  if (!token) {
+    setConnStatus(false, "Oturum Yok");
+    return;
+  }
+
+  try {
+    const me = await api.get("/users/me");
+
+    // /users/me is behind requireAuth only (not requireApproved), so a
+    // revoked/unapproved user with a still-valid token reaches here. Don't
+    // drop them into the app shell — show the pending-approval state instead.
+    const isAdmin = me.email === ADMIN_EMAIL;
+    if (!me.approved && !isAdmin) {
+      tokenStore.clear();
+      setConnStatus(false, "Onay Bekliyor");
+      const pending = document.getElementById("authPendingMsg");
+      if (pending) pending.style.display = "";
+      return; // auth screen stays visible by default
+    }
+
+    state.user = { email: me.email };
+    await onLoginSuccess();
+  } catch (e) {
+    if (e?.isNetworkError) {
+      toast("Backend bağlantısı yok — Demo modda devam ediliyor", "info");
+      document.getElementById("authScreen")?.classList.add("hidden");
+      if (typeof useDemoMode === "function") useDemoMode();
+    } else {
+      // invalid/expired token (401 already cleared it via forceLogout)
+      tokenStore.clear();
+      setConnStatus(false, "Oturum Yok");
+    }
+  }
+});
