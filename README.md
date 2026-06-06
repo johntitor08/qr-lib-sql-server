@@ -64,7 +64,11 @@ cp .env.example .env
 
 ### 3. Create the database schema
 
-Run the SQL scripts in `db/schema.sql` (if present) against your SQL Server instance to create the required tables (`users`, `books`, `highlights`, `loans`, `shelves`).
+Run `db/schema.sql` against your target database (the one named in `DB_DATABASE`) to create the required tables (`users`, `books`, `highlights`, `loans`, `shelves`). The script is idempotent — safe to re-run.
+
+```bash
+sqlcmd -S localhost -d bibliotheca -U sa -P 'yourStrong(!)Password' -i db/schema.sql
+```
 
 ### 4. Configure the frontend
 
