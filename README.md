@@ -142,6 +142,3 @@ All routes are prefixed with `/api/v1`.
 - **Rate limiting** — the API applies a limit of 300 requests per 15 minutes per IP.
 - **CORS** — set `CORS_ORIGINS` to the exact origin(s) your frontend is served from. In development `http://localhost:5500` (Live Server default) works out of the box.
 
-## License
-
-MIT
