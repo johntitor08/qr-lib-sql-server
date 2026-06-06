@@ -879,9 +879,9 @@ const QRGen = (() => {
     <div class="form-group" style="margin-bottom:20px">
       <label class="form-label">Sifre</label>
       <input type="password" class="form-input" id="authPassword" placeholder="En az 6 karakter" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter') submitAuth()" />
+        onkeydown="if(event.key==='Enter') handleAuthSubmit()" />
     </div>
-    <button class="btn btn-primary" id="authSubmitBtn" onclick="submitAuth()" style="width:100%;justify-content:center;height:46px;font-size:15px">Giris Yap</button>
+    <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuthSubmit()" style="width:100%;justify-content:center;height:46px;font-size:15px">Giriş Yap</button>
     <div style="text-align:center;margin-top:14px;display:flex;flex-direction:column;gap:8px">
       <button onclick="authDemoMode()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;font-family:inherit;text-decoration:underline">Demo modda devam et</button>
     </div>
@@ -1615,7 +1615,7 @@ const DEMO_HIGHLIGHTS = [
 
 // ═══════════════════════════════ CONFIG ═══════════════════════════════
 // ⚠️ Backend API adresinizi buraya yazın
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'http://localhost:3000/api/v1';
 const ADMIN_EMAIL = 'admin@example.com'; // .env'deki ADMIN_EMAIL ile aynı olmalı
 
 // Oturum durumu
@@ -1733,8 +1733,9 @@ async function loadBooks() {
   const grid = document.getElementById('booksGrid');
   if (grid) grid.innerHTML = [1,2,3,4].map(()=>`<div style="background:var(--ink2);border:1px solid var(--border);border-radius:var(--r2);height:180px;animation:shimmer 1.4s infinite linear"></div>`).join('');
   try {
-    const data = await api.get('/books');
-    books = data.map(b => ({ ...b, created_at: b.created_at ? new Date(b.created_at).toISOString() : new Date().toISOString() }));
+    const res = await api.get('/books');
+    const rows = Array.isArray(res) ? res : (res.data || []);
+    books = rows.map(b => ({ ...b, created_at: b.created_at ? new Date(b.created_at).toISOString() : new Date().toISOString() }));
     renderAll();
   } catch(e) { toast('Kitaplar yüklenemedi: ' + e.message, 'error'); }
 }

@@ -68,6 +68,7 @@ router.post("/register", async (req, res) => {
     if (role === "admin") {
       return res.status(201).json({
         token: makeToken({ id, email, role }),
+        email,
         approved: true,
       });
     }

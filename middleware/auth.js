@@ -34,7 +34,11 @@ function requireAdmin(req, res, next) {
     return res.status(401).json({ error: "Auth gerekli" });
   }
 
-  if (req.user.role !== "admin") {
+  const isAdmin =
+    req.user.role === "admin" ||
+    req.user.email?.toLowerCase() === process.env.ADMIN_EMAIL?.toLowerCase();
+
+  if (!isAdmin) {
     return res.status(403).json({ error: "Admin gerekli" });
   }
 
