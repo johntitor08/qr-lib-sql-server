@@ -113,7 +113,10 @@ async function apiFetch(path, options = {}) {
     return body;
   } catch (err) {
     if (err.name === "TypeError") {
-      throw new Error("Backend bağlantısı yok veya ağ hatası");
+      // fetch() rejects with a TypeError on network failure / CORS / DNS
+      const netErr = new Error("Backend bağlantısı yok veya ağ hatası");
+      netErr.isNetworkError = true;
+      throw netErr;
     }
     throw err;
   }
@@ -320,11 +323,23 @@ window.addEventListener("load", async () => {
 
   try {
     const me = await api.get("/users/me");
+
+    // /users/me is behind requireAuth only (not requireApproved), so a
+    // revoked/unapproved user with a still-valid token reaches here. Don't
+    // drop them into the app shell — show the pending-approval state instead.
+    const isAdmin = me.email === ADMIN_EMAIL;
+    if (!me.approved && !isAdmin) {
+      tokenStore.clear();
+      setConnStatus(false, "Onay Bekliyor");
+      const pending = document.getElementById("authPendingMsg");
+      if (pending) pending.style.display = "";
+      return; // auth screen stays visible by default
+    }
+
     state.user = { email: me.email };
     await onLoginSuccess();
   } catch (e) {
-    const msg = e?.message || "";
-    if (msg.includes("ağ") || msg.includes("bağlantı")) {
+    if (e?.isNetworkError) {
       toast("Backend bağlantısı yok — Demo modda devam ediliyor", "info");
       document.getElementById("authScreen")?.classList.add("hidden");
       if (typeof useDemoMode === "function") useDemoMode();
