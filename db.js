@@ -31,6 +31,7 @@ const config = {
 };
 
 let pool = null;
+let connecting = null;
 
 async function connectWithRetry(retries = 5, delay = 3000) {
   for (let i = 0; i < retries; i++) {
@@ -58,10 +59,20 @@ async function connectWithRetry(retries = 5, delay = 3000) {
 }
 
 async function getPool() {
-  if (!pool) {
-    pool = await connectWithRetry();
+  if (pool) return pool;
+  if (!connecting) {
+    connecting = connectWithRetry()
+      .then((p) => {
+        pool = p;
+        connecting = null;
+        return p;
+      })
+      .catch((err) => {
+        connecting = null;
+        throw err;
+      });
   }
-  return pool;
+  return connecting;
 }
 
 async function closePool() {

@@ -43,9 +43,42 @@ function forceLogout(message = "Oturum sona erdi") {
   state.highlights = [];
   state.loans = [];
 
+  // keep index.html's _currentUser in sync
+  if (typeof _currentUser !== "undefined") _currentUser = null;
+
   toast(message, "warning");
 
   document.getElementById("authScreen")?.classList.remove("hidden");
+
+  // restore sidebar / settings UI to logged-out state
+  const strip = document.getElementById("sidebarUserStrip");
+  if (strip) strip.style.display = "none";
+
+  const authSec = document.getElementById("settingsAuthSection");
+  if (authSec) authSec.style.display = "none";
+
+  const connForm = document.getElementById("settingsConnForm");
+  if (connForm) connForm.style.display = "";
+
+  const adminNav = document.getElementById("adminNavItem");
+  if (adminNav) adminNav.style.display = "none";
+
+  const authEmail = document.getElementById("authEmail");
+  if (authEmail) authEmail.value = "";
+
+  const authPassword = document.getElementById("authPassword");
+  if (authPassword) authPassword.value = "";
+
+  const authPending = document.getElementById("authPendingMsg");
+  if (authPending) authPending.style.display = "none";
+
+  const authError = document.getElementById("authError");
+  if (authError) authError.classList.remove("show");
+
+  const authSuccess = document.getElementById("authSuccess");
+  if (authSuccess) authSuccess.classList.remove("show");
+
+  setConnStatus(false, "Oturum Yok");
 }
 
 async function apiFetch(path, options = {}) {
@@ -75,7 +108,9 @@ async function apiFetch(path, options = {}) {
       throw new Error(err?.error || res.statusText);
     }
 
-    return await safeJson(res);
+    const body = await safeJson(res);
+    if (body === null) throw new Error("Sunucudan geçersiz yanıt alındı");
+    return body;
   } catch (err) {
     if (err.name === "TypeError") {
       throw new Error("Backend bağlantısı yok veya ağ hatası");
@@ -102,11 +137,46 @@ const api = {
   patch: (p, b) =>
     apiFetch(p, {
       method: "PATCH",
-      body: JSON.stringify(b),
+      body: b !== undefined ? JSON.stringify(b) : undefined,
     }),
 
   delete: (p) => apiFetch(p, { method: "DELETE" }),
 };
+
+// ── Auth UI state ─────────────────────────────────────────────────────────────
+
+let _authTab = "login";
+
+function switchAuthTab(tab) {
+  _authTab = tab;
+  document
+    .getElementById("authTabLogin")
+    .classList.toggle("active", tab === "login");
+  document
+    .getElementById("authTabRegister")
+    .classList.toggle("active", tab === "register");
+  document.getElementById("authSubmitBtn").textContent =
+    tab === "login" ? "Giriş Yap" : "Kayıt Ol";
+  document.getElementById("authError").classList.remove("show");
+  document.getElementById("authSuccess").classList.remove("show");
+  document.getElementById("authPendingMsg").style.display = "none";
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById("authError");
+  el.textContent = msg;
+  el.classList.add("show");
+  document.getElementById("authSuccess").classList.remove("show");
+}
+
+function showAuthSuccess(msg) {
+  const el = document.getElementById("authSuccess");
+  el.textContent = msg;
+  el.classList.add("show");
+  document.getElementById("authError").classList.remove("show");
+}
+
+// ── Auth actions ──────────────────────────────────────────────────────────────
 
 async function submitAuth(mode, email, password) {
   if (!email || !password) {
@@ -122,7 +192,9 @@ async function submitAuth(mode, email, password) {
 
   if (data?.token) {
     tokenStore.set(data.token);
-    state.user = { email: data.email };
+    // data.email is present for login and admin-register; fall back to the
+    // email the user typed so the sidebar is never blank
+    state.user = { email: data.email ?? email };
     return { ok: true, approved: true };
   }
 
@@ -132,23 +204,72 @@ async function submitAuth(mode, email, password) {
   };
 }
 
+// Called by HTML onclick / onkeydown — reads values from DOM then delegates
+async function handleAuthSubmit() {
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+
+  const btn = document.getElementById("authSubmitBtn");
+  btn.disabled = true;
+  btn.textContent =
+    _authTab === "login" ? "Giriş yapılıyor..." : "Kayıt yapılıyor...";
+
+  try {
+    const result = await submitAuth(_authTab, email, password);
+    if (result.approved) {
+      await onLoginSuccess();
+    } else {
+      showAuthSuccess("Kayıt alındı! Admin onayından sonra giriş yapabilirsiniz.");
+      switchAuthTab("login");
+      document.getElementById("authPendingMsg").style.display = "";
+    }
+  } catch (e) {
+    showAuthError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = _authTab === "login" ? "Giriş Yap" : "Kayıt Ol";
+  }
+}
+
 async function onLoginSuccess() {
   document.getElementById("authScreen").classList.add("hidden");
 
   const email = state.user?.email;
 
+  // keep index.html's _currentUser in sync so its guards work
+  if (typeof _currentUser !== "undefined") _currentUser = { email };
+
   const avatar = document.getElementById("sidebarUserAvatar");
   const emailEl = document.getElementById("sidebarUserEmail");
 
-  if (avatar) avatar.textContent = email?.[0]?.toUpperCase();
+  if (avatar) avatar.textContent = email?.[0]?.toUpperCase() ?? "?";
+  if (emailEl) emailEl.textContent = email ?? "";
 
-  if (emailEl) emailEl.textContent = email;
+  const strip = document.getElementById("sidebarUserStrip");
+  if (strip) strip.style.display = "";
+
+  const authSec = document.getElementById("settingsAuthSection");
+  if (authSec) authSec.style.display = "";
+
+  const connForm = document.getElementById("settingsConnForm");
+  if (connForm) connForm.style.display = "none";
+
+  const sAvatar = document.getElementById("settingsUserAvatar");
+  if (sAvatar) sAvatar.textContent = email?.[0]?.toUpperCase() ?? "?";
+
+  const sEmail = document.getElementById("settingsUserEmail");
+  if (sEmail) sEmail.textContent = email ?? "";
 
   setConnStatus(true, "Bağlı");
 
   await loadBooks();
   await loadHighlights();
   await loadLoans();
+
+  if (email === ADMIN_EMAIL) {
+    const adminNav = document.getElementById("adminNavItem");
+    if (adminNav) adminNav.style.display = "";
+  }
 
   toast("Giriş başarılı", "success");
 }
