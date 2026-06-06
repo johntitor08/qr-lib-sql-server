@@ -1,5 +1,5 @@
-if (!window.API_BASE) {
-  throw new Error("API_BASE tanımlı değil");
+if (typeof API_BASE === "undefined" || !API_BASE) {
+  throw new Error("API_BASE tanımlı değil — index.html içindeki API_BASE sabitini ayarlayın");
 }
 
 const state = {
