@@ -1,47 +1,116 @@
-// middleware/auth.js — JWT doğrulama (Firebase yok)
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
+// middleware/auth.js — Hardened JWT Auth Layer
 
-// Bearer token'ı doğrula, req.user'a yaz
+const jwt = require("jsonwebtoken");
+const { getPool, sql } = require("../db");
+require("dotenv").config();
+
 function requireAuth(req, res, next) {
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token gerekli' });
+
+  if (!header || !header.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Token gerekli" });
   }
+
+  const token = header.split(" ")[1];
+
   try {
-    const token = header.split('Bearer ')[1];
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    // req.user: { uid, email, iat, exp }
-    next();
-  } catch (e) {
-    res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token' });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // expected payload:
+    // { uid, email, role }
+
+    req.user = decoded;
+
+    return next();
+  } catch (err) {
+    return res.status(401).json({
+      error: "Geçersiz veya süresi dolmuş token",
+    });
   }
 }
 
-// Onaylı kullanıcı kontrolü
-async function requireApproved(req, res, next) {
-  if (req.user?.email === process.env.ADMIN_EMAIL) return next();
-  try {
-    const { getPool, sql } = require('../db');
-    const pool = await getPool();
-    const result = await pool.request()
-      .input('id', sql.NVarChar, req.user.uid)
-      .query(`SELECT approved FROM users WHERE id = @id`);
-    if (!result.recordset.length || !result.recordset[0].approved) {
-      return res.status(403).json({ error: 'Hesabınız henüz onaylanmadı' });
-    }
-    next();
-  } catch (e) {
-    res.status(500).json({ error: 'Yetki kontrolü başarısız' });
-  }
-}
-
-// Sadece admin erişimi
 function requireAdmin(req, res, next) {
-  if (req.user?.email !== process.env.ADMIN_EMAIL) {
-    return res.status(403).json({ error: 'Yetkisiz erişim' });
+  if (!req.user) {
+    return res.status(401).json({ error: "Auth gerekli" });
   }
-  next();
+
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admin gerekli" });
+  }
+
+  return next();
 }
 
-module.exports = { requireAuth, requireApproved, requireAdmin };
+const approvalCache = new Map();
+const CACHE_TTL = 60 * 1000;
+
+/* periodic cleanup → memory leak fix */
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of approvalCache.entries()) {
+    if (value.expires < now) {
+      approvalCache.delete(key);
+    }
+  }
+}, 60 * 1000);
+
+async function requireApproved(req, res, next) {
+  try {
+    // HARD GUARD
+    if (!req.user) {
+      return res.status(401).json({ error: "Auth gerekli" });
+    }
+
+    const userId = req.user.uid;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Geçersiz token payload" });
+    }
+
+    const cached = approvalCache.get(userId);
+
+    if (cached && cached.expires > Date.now()) {
+      if (!cached.approved) {
+        return res.status(403).json({ error: "Hesap onaylanmamış" });
+      }
+
+      return next();
+    }
+
+    const pool = await getPool();
+
+    const result = await pool
+      .request()
+      .input("id", sql.NVarChar, userId)
+      .query("SELECT approved FROM users WHERE id = @id");
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    const approved = !!result.recordset[0].approved;
+
+    approvalCache.set(userId, {
+      approved,
+      expires: Date.now() + CACHE_TTL,
+    });
+
+    if (!approved) {
+      return res.status(403).json({ error: "Hesap onaylanmamış" });
+    }
+
+    return next();
+  } catch (err) {
+    console.error("Approval check error:", err);
+
+    return res.status(500).json({
+      error: "Yetki kontrolü başarısız",
+    });
+  }
+}
+
+module.exports = {
+  requireAuth,
+  requireApproved,
+  requireAdmin,
+};
