@@ -1,5 +1,10 @@
 -- schema.sql — Bibliotheca SQL Server şeması
 
+CREATE DATABASE Bibliotheca;
+GO
+USE Bibliotheca;
+GO
+
 -- ============ users ============
 CREATE TABLE users (
     id NVARCHAR(64) NOT NULL PRIMARY KEY,
@@ -66,7 +71,6 @@ CREATE TABLE loans (
 CREATE INDEX IX_loans_user ON loans(user_id);
 
 -- ============ shelves ============
--- id INT identity (route'ta sql.Int olarak kullanılıyor)
 CREATE TABLE shelves (
     id INT IDENTITY(1,1) PRIMARY KEY,
     user_id NVARCHAR(64) NOT NULL,
@@ -76,3 +80,5 @@ CREATE TABLE shelves (
     CONSTRAINT UQ_shelves_user_code UNIQUE (user_id, code),
     CONSTRAINT FK_shelves_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+GO
