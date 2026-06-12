@@ -1614,8 +1614,11 @@ const DEMO_HIGHLIGHTS = [
 ];
 
 // ═══════════════════════════════ CONFIG ═══════════════════════════════
-// ⚠️ Backend API adresinizi buraya yazın
-const API_BASE = 'http://localhost:3000/api/v1';
+// Backend, frontend ile aynı porttan sunulur → aynı-origin kullan.
+// (file:// ile açılan demo modunda localhost:3002'ye düşer.)
+const API_BASE = (location.origin && location.origin.startsWith('http'))
+  ? location.origin + '/api/v1'
+  : 'http://localhost:3002/api/v1';
 const ADMIN_EMAIL = 'admin@example.com'; // .env'deki ADMIN_EMAIL ile aynı olmalı
 
 // Oturum durumu

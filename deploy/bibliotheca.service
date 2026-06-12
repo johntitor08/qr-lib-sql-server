@@ -1,0 +1,29 @@
+[Unit]
+Description=Bibliotheca API + Frontend (Node.js)
+Documentation=https://github.com/johntitor08/qr-lib-sql-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Uygulamanın sunucuda kurulduğu dizin
+WorkingDirectory=/opt/bibliotheca
+# .env dosyası buradan okunur (PORT=3002 dahil tüm ayarlar)
+EnvironmentFile=/opt/bibliotheca/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+# Hangi kullanıcı çalıştıracaksa (root yerine ayrı bir kullanıcı önerilir)
+User=bibliotheca
+Group=bibliotheca
+
+# Basit sertleştirme
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
