@@ -3,6 +3,8 @@
 require("express-async-errors");
 require("dotenv").config();
 
+const path = require("path");
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -46,7 +48,8 @@ app.use(
   }),
 );
 
-app.use(helmet());
+// Frontend ağır biçimde inline script ve CDN kullandığından CSP kapalı.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -72,6 +75,18 @@ app.use("/api/v1/highlights", highlightsRouter);
 app.use("/api/v1/loans", loansRouter);
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/shelves", shelvesRouter);
+
+// ── Frontend (tek port dağıtımı) ───────────────────────────────────────────
+// API ile aynı porttan statik arayüzü servis et. Sadece gerekli iki dosya
+// açılır; diğer kaynak dosyalar (.env, routes/, db.js ...) servis edilmez.
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+app.get("/api.js", (req, res) => {
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "api.js"));
+});
 
 app.get("/api/health", async (req, res) => {
   const pool = await getPool();
